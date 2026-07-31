@@ -1,23 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/session";
+import { getProfile } from "@/lib/profile";
 import { generateUniqueFriendCode } from "@/lib/friendCode";
-
-const profileSelect = {
-  id: true,
-  username: true,
-  displayName: true,
-  friendCode: true,
-  sharing: true,
-} as const;
 
 export async function GET() {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "yetkisiz" }, { status: 401 });
 
-  return NextResponse.json(
-    await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: profileSelect }),
-  );
+  return NextResponse.json(await getProfile(userId));
 }
 
 export async function PATCH(request: Request) {
@@ -55,7 +46,5 @@ export async function PATCH(request: Request) {
     });
   }
 
-  return NextResponse.json(
-    await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: profileSelect }),
-  );
+  return NextResponse.json(await getProfile(userId));
 }
