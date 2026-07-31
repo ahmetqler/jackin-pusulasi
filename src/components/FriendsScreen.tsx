@@ -8,7 +8,6 @@ import {
   formatFriendCode,
   normalizeFriendCode,
 } from "@/lib/friendCodeFormat";
-import { friendColor } from "@/lib/friendColor";
 import type { FriendRequests } from "@/lib/friendRequests";
 import type { Profile } from "@/lib/profile";
 import type { RadarPayload } from "@/lib/radar";
@@ -276,7 +275,7 @@ export default function FriendsScreen({
                 >
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: friendColor(friend.id) }}
+                    style={{ backgroundColor: friend.color }}
                   />
                   <span className="min-w-0 flex-1 truncate font-medium">{friend.name}</span>
                   <button

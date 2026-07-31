@@ -26,6 +26,7 @@ import { useEffect, useRef } from "react";
 
 export type DialFriend = {
   id: string;
+  name: string;
   bearing: number | null;
   distanceMeters: number | null;
   ageMs: number | null;
@@ -102,6 +103,7 @@ function angleDiff(a: number, b: number): number {
 type Bump = {
   /** Ekran açısı = kerteriz - pusula yönü (radyan). */
   angle: number;
+  name: string;
   amp: number;
   /** 0 = yakın (sivri uç), 1 = uzak (yayvan tümsek). */
   softness: number;
@@ -267,6 +269,7 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
 
         bumps.push({
           angle: ((friend.bearing - (head ?? 0)) * Math.PI) / 180,
+          name: friend.name,
           amp,
           softness: t,
           presence: 0.22 + 0.78 * (1 - t),
@@ -357,6 +360,10 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
       // Akan yıldızlar ucun tam tepesine her an denk gelmiyor, o yüzden sivri
       // ucun parlaklığı sallanıyordu. Ekvatora sabitlenmiş bu yıldız, en kritik
       // bilgiyi — yönü — her karede okunur tutuyor.
+      // Tek arkadaş varsa isim yazmıyoruz — kimin olduğu zaten kürenin altındaki
+      // yazıda duruyor, kadranı gereksiz kalabalıklaştırmanın anlamı yok.
+      const showNames = bumps.length > 1;
+
       for (const bump of bumps) {
         const r = sphereRadius + bump.amp;
         const x = c + Math.sin(bump.angle) * r;
@@ -374,6 +381,43 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, TAU);
         ctx.fill();
+
+        if (!showNames) continue;
+
+        const label = bump.name.length > 12 ? `${bump.name.slice(0, 11)}…` : bump.name;
+        const fontSize = Math.max(10, size * 0.033);
+        ctx.font = `500 ${fontSize}px var(--font-geist-sans), system-ui, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        // Etiket yıldızın dışına itiliyor. Kaçış payına metnin kendi yarısı da
+        // ekleniyor: yatay yönlerde sadece sabit bir boşluk bırakınca yazı geri
+        // gelip yıldızın üstüne biniyor. Sonra tuvalin içinde kalacak şekilde
+        // kıstırılıyor — kuzeydeki uzun bir çıkıntıda yazı üstten taşabiliyor.
+        const width = ctx.measureText(label).width;
+        const dx = Math.sin(bump.angle);
+        const dy = -Math.cos(bump.angle);
+        const gap = radius + 5;
+        const pad = 3;
+        const lx = Math.min(
+          size - width / 2 - pad,
+          Math.max(width / 2 + pad, x + dx * (gap + (width / 2) * Math.abs(dx))),
+        );
+        const ly = Math.min(
+          size - fontSize / 2 - pad,
+          Math.max(fontSize / 2 + pad, y + dy * (gap + (fontSize / 2) * Math.abs(dy))),
+        );
+
+        // Yıldızların üstünde okunabilsin diye koyu bir kontur.
+        ctx.globalAlpha = base * 0.85;
+        ctx.lineWidth = 3;
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = "#05060b";
+        ctx.strokeText(label, lx, ly);
+
+        ctx.globalAlpha = base * (0.55 + 0.45 * bump.presence);
+        ctx.fillStyle = fill;
+        ctx.fillText(label, lx, ly);
       }
 
       // --- Merkez: sen ---

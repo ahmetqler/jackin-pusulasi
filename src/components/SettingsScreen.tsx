@@ -6,6 +6,7 @@ import BottomNav from "@/components/BottomNav";
 import CompassDebug from "@/components/CompassDebug";
 import { formatFriendCode } from "@/lib/friendCodeFormat";
 import type { Profile } from "@/lib/profile";
+import { STAR_COLORS } from "@/lib/starColors";
 
 export default function SettingsScreen({ initialProfile }: { initialProfile: Profile }) {
   const router = useRouter();
@@ -86,6 +87,33 @@ export default function SettingsScreen({ initialProfile }: { initialProfile: Pro
           <p className="mt-3 text-xs text-muted">
             @{profile.username} · kod {formatFriendCode(profile.friendCode)}
           </p>
+        </section>
+
+        <section className="rounded-xl border border-edge bg-surface p-4">
+          <h2 className="font-semibold">Yıldızının rengi</h2>
+          <p className="mt-1 text-sm leading-relaxed text-muted">
+            Arkadaşların seni bu renkte görür. Kalabalıkta kimin nerede olduğunu
+            ayırt etmeye yarar.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2.5">
+            {STAR_COLORS.map((option) => {
+              const active = profile.color === option.hex;
+              return (
+                <button
+                  key={option.hex}
+                  type="button"
+                  disabled={busy}
+                  aria-label={option.name}
+                  aria-pressed={active}
+                  onClick={() => void patch({ color: option.hex }, `Rengin: ${option.name}`)}
+                  className={`h-9 w-9 rounded-full transition-transform ${
+                    active ? "scale-110 ring-2 ring-foreground ring-offset-2 ring-offset-surface" : ""
+                  }`}
+                  style={{ backgroundColor: option.hex }}
+                />
+              );
+            })}
+          </div>
         </section>
 
         <section className="rounded-xl border border-edge bg-surface p-4">

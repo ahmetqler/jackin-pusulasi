@@ -26,6 +26,8 @@ model User {
   displayName  String
   passwordHash String
   friendCode   String   @unique
+  /// Kullanıcının kendi seçtiği yıldız rengi (hex). Arkadaşları bu renkte görür.
+  color        String   @default("#e8c37a")
   sharing      Boolean  @default(true)
   createdAt    DateTime @default(now())
 

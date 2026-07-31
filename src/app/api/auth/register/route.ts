@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { createSessionToken, sessionCookie } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { generateUniqueFriendCode } from "@/lib/friendCode";
+import { randomStarColor } from "@/lib/starColors";
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
       displayName,
       passwordHash: await hashPassword(password),
       friendCode: await generateUniqueFriendCode(),
+      color: randomStarColor(),
     },
     select: { id: true, username: true, displayName: true, friendCode: true },
   });

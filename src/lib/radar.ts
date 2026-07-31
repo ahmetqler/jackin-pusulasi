@@ -18,6 +18,8 @@ import {
 export type FriendView = {
   id: string;
   name: string;
+  /** Arkadaşın kendi seçtiği yıldız rengi (hex). */
+  color: string;
   /** Arkadaş paylaşımı açık mı — kapalıysa UI "Gizli" gösterir. */
   sharing: boolean;
   /** 0–359, saat yönünde, gerçek kuzeyden. Hesaplanamıyorsa null. */
@@ -45,6 +47,7 @@ const LOCATION_TTL_MS = 24 * 60 * 60 * 1000;
 const friendSelect = {
   id: true,
   displayName: true,
+  color: true,
   sharing: true,
   location: { select: { lat: true, lng: true, updatedAt: true } },
 } as const;
@@ -105,6 +108,7 @@ export async function buildRadarPayload(userId: string): Promise<RadarPayload | 
       return {
         id: other.id,
         name: other.displayName,
+        color: other.color,
         sharing: other.sharing,
         bearing,
         distanceMeters,

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getUserId, unauthorized } from "@/lib/session";
 import { getProfile } from "@/lib/profile";
 import { generateUniqueFriendCode } from "@/lib/friendCode";
+import { isStarColor } from "@/lib/starColors";
 
 export async function GET() {
   const userId = await getUserId();
@@ -29,6 +30,15 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Görünen ad 1–30 karakter olmalı" }, { status: 400 });
     }
     await prisma.user.update({ where: { id: userId }, data: { displayName } });
+  }
+
+  if (raw.color !== undefined) {
+    // Paletle sınırlı: koyu zeminde okunmayan bir renk kadranı işe yaramaz
+    // hâle getirir, üstelik bu renk arkadaşlarının ekranında da görünüyor.
+    if (!isStarColor(raw.color)) {
+      return NextResponse.json({ error: "Geçersiz renk" }, { status: 400 });
+    }
+    await prisma.user.update({ where: { id: userId }, data: { color: raw.color } });
   }
 
   if (typeof raw.sharing === "boolean") {

@@ -5,6 +5,7 @@ export const profileSelect = {
   username: true,
   displayName: true,
   friendCode: true,
+  color: true,
   sharing: true,
 } as const;
 
@@ -13,6 +14,7 @@ export type Profile = {
   username: string;
   displayName: string;
   friendCode: string;
+  color: string;
   sharing: boolean;
 };
 

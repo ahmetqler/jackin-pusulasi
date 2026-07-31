@@ -10,7 +10,6 @@ import { useHeading } from "@/hooks/useHeading";
 import { useNow, usePageActive } from "@/hooks/usePageActive";
 import { useRadar } from "@/hooks/useRadar";
 import { bearingToCardinal, formatAge, formatDistance } from "@/lib/format";
-import { friendColor } from "@/lib/friendColor";
 
 export default function RadarScreen() {
   const active = usePageActive();
@@ -31,10 +30,11 @@ export default function RadarScreen() {
   // Saniye başı yaşlar değiştiği için memolamanın anlamı yok.
   const dialFriends: DialFriend[] = friends.map((friend) => ({
     id: friend.id,
+    name: friend.name,
     bearing: friend.bearing,
     distanceMeters: friend.distanceMeters,
     ageMs: ageOf(friend.updatedAt),
-    color: friendColor(friend.id),
+    color: friend.color,
   }));
 
   const nearest = friends.find((f) => f.distanceMeters !== null) ?? null;
@@ -161,7 +161,7 @@ export default function RadarScreen() {
               <FriendRow
                 key={friend.id}
                 friend={friend}
-                color={friendColor(friend.id)}
+                color={friend.color}
                 rotation={friend.bearing === null ? null : friend.bearing - (compass.heading ?? 0)}
                 ageMs={ageOf(friend.updatedAt)}
                 northUp={northUp}
