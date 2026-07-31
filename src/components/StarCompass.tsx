@@ -53,8 +53,10 @@ const SIGMA_SHARP = 0.06; // radyan — yakındaki sivri ucun genişliği
 const SIGMA_SOFT = 0.3; // radyan — uzaktaki yayvan tümseğin genişliği
 
 /** Halkanın kesit kalınlığı ve derinlik paralaksı. */
-const BAND = 0.022;
-const PARALLAX = 0.05;
+const BAND = 0.03;
+const PARALLAX = 0.11;
+/** Öndeki yıldızlar arkadakilerden bu oranda hızlı akar (hareket paralaksı). */
+const DEPTH_SPEED = 0.55;
 
 const FADE_MS = 5 * 60 * 1000;
 
@@ -137,19 +139,17 @@ const STAR_RGB: [number, number, number] = [226, 232, 240];
 // Gökyüzü sabit ve prop'lardan bağımsız — bir kez, modül yüklenirken üretilir.
 const RING: RingStar[] = (() => {
   const random = makeRandom(20260731);
-  const stars = Array.from({ length: RING_STARS }, (_, i) => {
-    // İki bağımsız rastgele sayının ortalaması: derinlik kenarlarda seyrek,
-    // ortada yoğun olsun — düz dağılım halkayı içi boş bir boru gibi gösteriyor.
-    const depth = random() + random() - 1;
-    return {
-      base: (i / RING_STARS) * TAU + (random() - 0.5) * 0.014,
-      depth,
-      band: random() + random() - 1,
-      size: 0.4 + random() * 0.9,
-      phase: random() * TAU,
-      speed: 1.1 + random() * 2.4,
-    };
-  });
+  const stars = Array.from({ length: RING_STARS }, (_, i) => ({
+    base: (i / RING_STARS) * TAU + (random() - 0.5) * 0.014,
+    // Düz dağılım: derinlik uçlarında da bol yıldız olsun, boy ve parlaklık
+    // farkı belirgin kalsın. Üçgen dağılımda hepsi orta derinliğe toplanıp
+    // halka yassılaşıyordu.
+    depth: random() * 2 - 1,
+    band: random() + random() - 1,
+    size: 0.4 + random() * 0.9,
+    phase: random() * TAU,
+    speed: 1.1 + random() * 2.4,
+  }));
   // Uzaktakiler önce çizilsin ki yakındakiler üstlerine binsin.
   return stars.sort((a, b) => a.depth - b.depth);
 })();
@@ -280,7 +280,11 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
       // --- Çember: yalnızca yıldızlardan, saat yönünün TERSİNE akar ---
       const ringPhase = seconds * 0.045; // tam tur ~140 sn
       for (const star of RING) {
-        const a = star.base - ringPhase;
+        const near = (star.depth + 1) / 2; // 0 arka, 1 ön
+        // Hareket paralaksı: öndeki yıldızlar arkadakilerden hızlı akar.
+        // Derinlik hissini en çok bu veriyor — sabit bir resimde göremezsin,
+        // ama ekrana bakınca halka anında hacim kazanıyor.
+        const a = star.base - ringPhase * (1 - DEPTH_SPEED / 2 + DEPTH_SPEED * near);
 
         let displacement = uniform;
         let strongest = 0;
@@ -307,22 +311,23 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
         const x = c + Math.sin(a) * r;
         const y = c - Math.cos(a) * r;
 
-        const near = (star.depth + 1) / 2; // 0 arka, 1 ön
         const twinkle = 0.55 + 0.45 * Math.sin(seconds * star.speed + star.phase);
         // Çıkıntıya yakalanan yıldız biraz büyür ve parlar — ama şekli
         // boğmayacak kadar; asıl anlatan şey çemberin bozulması.
-        const radius = star.size * (0.6 + 0.75 * near) * (1 + strongest * 0.7);
+        const radius = star.size * (0.4 + 1.2 * near) * (1 + strongest * 0.7);
         const alpha =
-          base * Math.min(1, twinkle * (0.42 + 0.52 * near + strongest * 0.6));
+          base * Math.min(1, twinkle * (0.3 + 0.68 * near + strongest * 0.6));
         const fill = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 
+        // Alan derinliği: uzaktaki yıldız geniş ve dağınık (odak dışı),
+        // öndeki sıkı bir hâle ile keskin bir çekirdek.
         ctx.fillStyle = fill;
-        ctx.globalAlpha = alpha * 0.16;
+        ctx.globalAlpha = alpha * (0.1 + 0.12 * (1 - near));
         ctx.beginPath();
-        ctx.arc(x, y, radius * 2.2, 0, TAU);
+        ctx.arc(x, y, radius * (3.4 - 1.6 * near), 0, TAU);
         ctx.fill();
 
-        ctx.globalAlpha = alpha;
+        ctx.globalAlpha = alpha * (0.3 + 0.7 * near);
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, TAU);
         ctx.fill();
