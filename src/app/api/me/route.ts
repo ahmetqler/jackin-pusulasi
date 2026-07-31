@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getUserId } from "@/lib/session";
+import { getUserId, unauthorized } from "@/lib/session";
 import { getProfile } from "@/lib/profile";
 import { generateUniqueFriendCode } from "@/lib/friendCode";
 
@@ -8,12 +8,17 @@ export async function GET() {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "yetkisiz" }, { status: 401 });
 
-  return NextResponse.json(await getProfile(userId));
+  const profile = await getProfile(userId);
+  if (!profile) return unauthorized();
+
+  return NextResponse.json(profile);
 }
 
 export async function PATCH(request: Request) {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "yetkisiz" }, { status: 401 });
+
+  if (!(await getProfile(userId))) return unauthorized();
 
   const body: unknown = await request.json().catch(() => null);
   const raw = (body ?? {}) as Record<string, unknown>;
@@ -46,5 +51,8 @@ export async function PATCH(request: Request) {
     });
   }
 
-  return NextResponse.json(await getProfile(userId));
+  const updated = await getProfile(userId);
+  if (!updated) return unauthorized();
+
+  return NextResponse.json(updated);
 }

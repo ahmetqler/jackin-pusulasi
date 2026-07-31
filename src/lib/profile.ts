@@ -16,6 +16,7 @@ export type Profile = {
   sharing: boolean;
 };
 
-export function getProfile(userId: string): Promise<Profile> {
-  return prisma.user.findUniqueOrThrow({ where: { id: userId }, select: profileSelect });
+/** Kullanıcı artık yoksa null — çağıran taraf oturumu sonlandırır. */
+export function getProfile(userId: string): Promise<Profile | null> {
+  return prisma.user.findUnique({ where: { id: userId }, select: profileSelect });
 }

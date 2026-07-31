@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getUserId } from "@/lib/session";
+import { getUserId, unauthorized } from "@/lib/session";
 import { buildRadarPayload } from "@/lib/radar";
 import { isValidLat, isValidLng } from "@/lib/geo";
 
@@ -27,10 +27,11 @@ export async function POST(request: Request) {
       ? Math.min(100000, Math.max(0, Math.round(raw.accuracy)))
       : null;
 
-  const me = await prisma.user.findUniqueOrThrow({
+  const me = await prisma.user.findUnique({
     where: { id: userId },
     select: { sharing: true, location: { select: { updatedAt: true } } },
   });
+  if (!me) return unauthorized();
 
   if (!me.sharing) {
     return NextResponse.json({ error: "Görünmez moddasın" }, { status: 409 });
@@ -48,7 +49,10 @@ export async function POST(request: Request) {
     });
   }
 
-  return NextResponse.json(await buildRadarPayload(userId));
+  const payload = await buildRadarPayload(userId);
+  if (!payload) return unauthorized();
+
+  return NextResponse.json(payload);
 }
 
 /** Konumumu sil — sunucuda hiçbir kaydım kalmasın. */
@@ -57,5 +61,9 @@ export async function DELETE() {
   if (!userId) return NextResponse.json({ error: "yetkisiz" }, { status: 401 });
 
   await prisma.location.deleteMany({ where: { userId } });
-  return NextResponse.json(await buildRadarPayload(userId));
+
+  const payload = await buildRadarPayload(userId);
+  if (!payload) return unauthorized();
+
+  return NextResponse.json(payload);
 }

@@ -92,6 +92,13 @@ type Bump = {
   amp: number;
   /** 0 = yakın (sivri uç), 1 = uzak (yayvan tümsek). */
   softness: number;
+  /**
+   * Renk ve parlaklığın ne kadar bastıracağı. Çıkıntının BOYU zaten mesafeyle
+   * küçülüyor; bu da olmazsa 300 km'deki arkadaş 60 m'deki kadar parlak yeşil
+   * oluyor ve uzaklık hissi kayboluyor. Yine de sıfıra inmiyor — rengi
+   * görünmezse çıkıntının kime ait olduğu anlaşılmaz.
+   */
+  presence: number;
   rgb: [number, number, number];
 };
 
@@ -219,6 +226,7 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
           angle: ((friend.bearing - (head ?? 0)) * Math.PI) / 180,
           amp,
           softness: t,
+          presence: 0.22 + 0.78 * (1 - t),
           rgb,
         });
       }
@@ -278,9 +286,12 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
         for (const bump of bumps) {
           const weight = bumpWeight(angleDiff(a, bump.angle), bump.softness);
           displacement += bump.amp * weight;
-          if (weight > strongest) {
-            strongest = weight;
-            rgb = mix(STAR_RGB, bump.rgb, Math.min(1, weight * 1.25));
+          // "En güçlü" derken sadece açısal yakınlık değil, arkadaşın ne kadar
+          // yakın olduğu da sayılıyor — yoksa 300 km'deki biri kadranı ele geçirir.
+          const shout = weight * bump.presence;
+          if (shout > strongest) {
+            strongest = shout;
+            rgb = mix(STAR_RGB, bump.rgb, Math.min(1, shout * 1.25));
           }
         }
 
@@ -366,10 +377,14 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
     };
   }, []);
 
+  // Kadranın boyunu eni belirliyor (kare), o yüzden sınırı da ene koyuyoruz:
+  // hem kutuya hem ekran yüksekliğine sığsın. 40dvh, iPhone 16 Pro'da başlık,
+  // mesafe yazısı, arkadaş listesi ve alt menüden sonra kalan boşluğa oturuyor;
+  // daha kısa telefonlarda kadran kendiliğinden küçülüyor.
   return (
     <canvas
       ref={canvasRef}
-      className="block aspect-square w-full"
+      className="block aspect-square w-full max-w-[40dvh]"
       aria-hidden="true"
     />
   );

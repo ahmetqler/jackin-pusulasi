@@ -7,5 +7,9 @@ export default async function Page() {
   const userId = await getUserId();
   if (!userId) redirect("/login");
 
-  return <SettingsScreen initialProfile={await getProfile(userId)} />;
+  const profile = await getProfile(userId);
+  // Jeton geçerli ama kullanıcı yok (hesap silinmiş): oturumu bitir.
+  if (!profile) redirect("/login");
+
+  return <SettingsScreen initialProfile={profile} />;
 }

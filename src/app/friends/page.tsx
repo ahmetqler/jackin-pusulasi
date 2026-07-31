@@ -15,6 +15,9 @@ export default async function Page() {
     getFriendRequests(userId),
   ]);
 
+  // Jeton geçerli ama kullanıcı yok (hesap silinmiş): oturumu bitir.
+  if (!profile || !radar) redirect("/login");
+
   return (
     <FriendsScreen
       initialProfile={profile}

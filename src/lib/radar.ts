@@ -49,14 +49,15 @@ const friendSelect = {
   location: { select: { lat: true, lng: true, updatedAt: true } },
 } as const;
 
-export async function buildRadarPayload(userId: string): Promise<RadarPayload> {
+/** Kullanıcı artık yoksa null — çağıran taraf oturumu sonlandırır. */
+export async function buildRadarPayload(userId: string): Promise<RadarPayload | null> {
   // Kendiliğinden temizlik: 24 saatten eski konumlar buharlaşır, cron gerekmez.
   void prisma.location
     .deleteMany({ where: { updatedAt: { lt: new Date(Date.now() - LOCATION_TTL_MS) } } })
     .catch(() => {});
 
   const [me, friendships, pendingRequests] = await Promise.all([
-    prisma.user.findUniqueOrThrow({
+    prisma.user.findUnique({
       where: { id: userId },
       select: {
         sharing: true,
@@ -76,6 +77,8 @@ export async function buildRadarPayload(userId: string): Promise<RadarPayload> {
     }),
     prisma.friendship.count({ where: { addresseeId: userId, status: "PENDING" } }),
   ]);
+
+  if (!me) return null;
 
   // Görünmez moddayken konum satırı zaten silinmiş olur; o yüzden karşılıklı:
   // paylaşmıyorsan sen de kimsenin yönünü göremezsin.

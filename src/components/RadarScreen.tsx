@@ -79,7 +79,7 @@ export default function RadarScreen() {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-4">
+      <main className="mx-auto flex w-full min-h-0 max-w-md flex-1 flex-col gap-3 px-4">
         {geoStatus === "denied" && (
           <Card
             title="Konum izni gerekli"
@@ -111,7 +111,7 @@ export default function RadarScreen() {
           />
         )}
 
-        <div className="pt-2">
+        <div className="flex flex-1 items-center justify-center">
           <StarCompass
             friends={dialFriends}
             heading={compass.heading}
@@ -156,7 +156,7 @@ export default function RadarScreen() {
         )}
 
         {friends.length > 0 ? (
-          <ul className="overflow-hidden rounded-xl border border-edge bg-surface">
+          <ul className="max-h-[26dvh] overflow-y-auto rounded-xl border border-edge bg-surface">
             {friends.map((friend) => (
               <FriendRow
                 key={friend.id}

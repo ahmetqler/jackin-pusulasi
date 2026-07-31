@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getUserId } from "@/lib/session";
+import { getUserId, unauthorized } from "@/lib/session";
 import { buildRadarPayload } from "@/lib/radar";
 
 /**
@@ -10,5 +10,8 @@ export async function GET() {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "yetkisiz" }, { status: 401 });
 
-  return NextResponse.json(await buildRadarPayload(userId));
+  const payload = await buildRadarPayload(userId);
+  if (!payload) return unauthorized();
+
+  return NextResponse.json(payload);
 }
