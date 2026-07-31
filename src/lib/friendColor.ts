@@ -1,15 +1,16 @@
+// Doğrudan hex — kadran canvas'a çiziliyor ve canvas CSS değişkeni okuyamaz.
 const FRIEND_COLORS = [
-  "var(--friend-1)",
-  "var(--friend-2)",
-  "var(--friend-3)",
-  "var(--friend-4)",
-  "var(--friend-5)",
+  "#e8c37a", // altın
+  "#7dd3fc", // buz mavisi
+  "#fda4af", // gül
+  "#c4b5fd", // menekşe
+  "#86efac", // nane
 ];
 
 /**
  * Renk arkadaşın id'sinden türetilir, listedeki sırasından değil — liste
  * mesafeye göre sıralandığı için sıra sürekli değişiyor ve renkler yer
- * değiştirseydi kadrandaki ibre kimin olduğu anlaşılmazdı.
+ * değiştirseydi gökyüzündeki çıkıntının kime ait olduğu anlaşılmazdı.
  */
 export function friendColor(id: string): string {
   let hash = 0;

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import BottomNav from "@/components/BottomNav";
-import CompassDial, { type DialFriend } from "@/components/CompassDial";
+import StarCompass, { type DialFriend } from "@/components/StarCompass";
 import FriendRow from "@/components/FriendRow";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useHeading } from "@/hooks/useHeading";
@@ -112,7 +112,7 @@ export default function RadarScreen() {
         )}
 
         <div className="pt-2">
-          <CompassDial
+          <StarCompass
             friends={dialFriends}
             heading={compass.heading}
             waiting={geoStatus === "waiting"}
