@@ -13,6 +13,12 @@ import { useEffect, useRef } from "react";
  * Yıldızlar akar ama çıkıntı ekranda sabit durur: yıldızlar çıkıntının içinden
  * geçip yollarına devam eder. Böylece hem dönme hissi hem de doğru yön aynı
  * anda korunur.
+ *
+ * Hacim hissi DERİNLİKTEN gelir, perspektiften değil. Çemberi elips gibi
+ * yatırmak 3B görünürdü ama açıları kaydırırdı; bu uygulamanın tek işi doğru
+ * yönü göstermek olduğu için çember tam daire kalıyor. Bunun yerine yıldızlar
+ * bir halka kesiti içinde öne/arkaya dağılıyor: öndekiler büyük ve parlak,
+ * arkadakiler küçük ve sönük, üstelik hafif paralaksla biraz daha dışarıda.
  */
 
 export type DialFriend = {
@@ -33,21 +39,22 @@ type Props = {
   dimmed?: boolean;
 };
 
-// Sivri uç sadece birkaç dereceye yayıldığı için çemberde bol yıldız gerek —
-// yoksa köşeyi çizecek yıldız kalmıyor.
-const RING_STARS = 220;
-const SKY_STARS = 72;
+const RING_STARS = 440;
+const SKY_STARS = 260;
 
 /** Çıkıntı ölçeğinin uçları. */
 const NEAR_M = 50;
 const FAR_M = 300_000;
 
-const R_RING = 0.26; // çemberin yarıçapı (kenar uzunluğuna oran)
+const R_RING = 0.28; // çemberin yarıçapı (kenar uzunluğuna oran)
 const AMP_NEAR = 0.17; // 50 m'de çıkıntının boyu
 const AMP_FAR = 0.022; // 300 km'de çıkıntının boyu
 const SIGMA_SHARP = 0.06; // radyan — yakındaki sivri ucun genişliği
 const SIGMA_SOFT = 0.3; // radyan — uzaktaki yayvan tümseğin genişliği
-const R_LETTERS = 0.46;
+
+/** Halkanın kesit kalınlığı ve derinlik paralaksı. */
+const BAND = 0.022;
+const PARALLAX = 0.05;
 
 const FADE_MS = 5 * 60 * 1000;
 
@@ -84,9 +91,6 @@ function angleDiff(a: number, b: number): number {
   return Math.abs(((a - b + Math.PI * 3) % TAU) - Math.PI);
 }
 
-type RingStar = { base: number; radial: number; size: number; phase: number; speed: number };
-type SkyStar = { angle: number; radius: number; size: number; phase: number };
-
 type Bump = {
   angle: number;
   amp: number;
@@ -94,7 +98,7 @@ type Bump = {
   softness: number;
   /**
    * Renk ve parlaklığın ne kadar bastıracağı. Çıkıntının BOYU zaten mesafeyle
-   * küçülüyor; bu da olmazsa 300 km'deki arkadaş 60 m'deki kadar parlak yeşil
+   * küçülüyor; bu da olmazsa 300 km'deki arkadaş 60 m'deki kadar parlak
    * oluyor ve uzaklık hissi kayboluyor. Yine de sıfıra inmiyor — rengi
    * görünmezse çıkıntının kime ait olduğu anlaşılmaz.
    */
@@ -115,26 +119,49 @@ function bumpWeight(delta: number, softness: number): number {
   return sharp * (1 - softness) + soft * softness;
 }
 
+type RingStar = {
+  base: number;
+  /** -1 arkada, +1 önde. */
+  depth: number;
+  /** Halka kesiti içindeki yeri, -1..1. */
+  band: number;
+  size: number;
+  phase: number;
+  speed: number;
+};
+
+type SkyStar = { angle: number; radius: number; depth: number; size: number; phase: number };
+
 const STAR_RGB: [number, number, number] = [226, 232, 240];
 
 // Gökyüzü sabit ve prop'lardan bağımsız — bir kez, modül yüklenirken üretilir.
-const RING = ((): RingStar[] => {
+const RING: RingStar[] = (() => {
   const random = makeRandom(20260731);
-  return Array.from({ length: RING_STARS }, (_, i) => ({
-    base: (i / RING_STARS) * TAU + (random() - 0.5) * 0.02,
-    radial: (random() - 0.5) * 0.055,
-    size: 0.45 + random() * 0.95,
-    phase: random() * TAU,
-    speed: 1.1 + random() * 2.4,
-  }));
+  const stars = Array.from({ length: RING_STARS }, (_, i) => {
+    // İki bağımsız rastgele sayının ortalaması: derinlik kenarlarda seyrek,
+    // ortada yoğun olsun — düz dağılım halkayı içi boş bir boru gibi gösteriyor.
+    const depth = random() + random() - 1;
+    return {
+      base: (i / RING_STARS) * TAU + (random() - 0.5) * 0.014,
+      depth,
+      band: random() + random() - 1,
+      size: 0.4 + random() * 0.9,
+      phase: random() * TAU,
+      speed: 1.1 + random() * 2.4,
+    };
+  });
+  // Uzaktakiler önce çizilsin ki yakındakiler üstlerine binsin.
+  return stars.sort((a, b) => a.depth - b.depth);
 })();
 
-const SKY = ((): SkyStar[] => {
+const SKY: SkyStar[] = (() => {
   const random = makeRandom(981133);
   return Array.from({ length: SKY_STARS }, () => ({
     angle: random() * TAU,
-    radius: 0.06 + random() * 0.46,
-    size: 0.35 + random() * 0.75,
+    // sqrt: köşelere kadar eşit yoğunlukta dağılsın, merkezde yığılmasın.
+    radius: 0.04 + Math.sqrt(random()) * 0.66,
+    depth: random() + random() - 1,
+    size: 0.3 + random() * 0.7,
     phase: random() * TAU,
   }));
 })();
@@ -190,9 +217,9 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
 
       const c = size / 2;
       const ringRadius = size * R_RING;
+      const base = isDimmed ? 0.28 : 1;
 
       ctx.clearRect(0, 0, size, size);
-      ctx.globalAlpha = 1;
 
       // --- Arkadaşların gökyüzünde açtığı çukurlar ---
       const bumps: Bump[] = [];
@@ -231,48 +258,26 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
         });
       }
 
-      const displacementAt = (angle: number) => {
-        let value = uniform;
-        for (const bump of bumps) {
-          value += bump.amp * bumpWeight(angleDiff(angle, bump.angle), bump.softness);
-        }
-        return value;
-      };
-
-      ctx.globalAlpha = isDimmed ? 0.28 : 1;
-
       // --- Uzaktaki yıldızlar (daha yavaş döner: derinlik hissi) ---
       const skyPhase = seconds * 0.012;
       for (const star of SKY) {
         const a = star.angle - skyPhase;
         const r = star.radius * size;
-        const twinkle = 0.25 + 0.25 * Math.sin(seconds * 0.8 + star.phase);
-        ctx.globalAlpha = (isDimmed ? 0.28 : 1) * twinkle;
+        const twinkle = 0.26 + 0.24 * Math.sin(seconds * 0.8 + star.phase);
+        ctx.globalAlpha = base * twinkle * (0.45 + 0.55 * ((star.depth + 1) / 2));
         ctx.fillStyle = "#c7d2e3";
         ctx.beginPath();
-        ctx.arc(c + Math.sin(a) * r, c - Math.cos(a) * r, star.size, 0, TAU);
+        ctx.arc(
+          c + Math.sin(a) * r,
+          c - Math.cos(a) * r,
+          star.size * (0.7 + 0.6 * ((star.depth + 1) / 2)),
+          0,
+          TAU,
+        );
         ctx.fill();
       }
 
-      ctx.globalAlpha = isDimmed ? 0.28 : 1;
-
-      // --- Çemberin bozulmuş hattı: köşenin şeklini okunur kılar ---
-      // Sivri uçta örnekleme sıklığı önemli, 720 nokta tepeyi keskin bırakıyor.
-      ctx.beginPath();
-      for (let i = 0; i <= 720; i++) {
-        const a = (i / 720) * TAU;
-        const r = ringRadius + displacementAt(a);
-        const x = c + Math.sin(a) * r;
-        const y = c - Math.cos(a) * r;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      ctx.strokeStyle = "rgba(170, 186, 220, 0.3)";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      // --- Çemberdeki yıldızlar: saat yönünün TERSİNE akar ---
+      // --- Çember: yalnızca yıldızlardan, saat yönünün TERSİNE akar ---
       const ringPhase = seconds * 0.045; // tam tur ~140 sn
       for (const star of RING) {
         const a = star.base - ringPhase;
@@ -295,51 +300,61 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
           }
         }
 
-        const r = ringRadius + displacement + star.radial * size * 0.12;
+        // Halka kesiti + derinlik paralaksı: öndeki yıldız biraz daha dışarıda.
+        const r =
+          (ringRadius + displacement + star.band * size * BAND) *
+          (1 + star.depth * PARALLAX);
         const x = c + Math.sin(a) * r;
         const y = c - Math.cos(a) * r;
 
+        const near = (star.depth + 1) / 2; // 0 arka, 1 ön
         const twinkle = 0.55 + 0.45 * Math.sin(seconds * star.speed + star.phase);
         // Çıkıntıya yakalanan yıldız biraz büyür ve parlar — ama şekli
         // boğmayacak kadar; asıl anlatan şey çemberin bozulması.
-        const boost = 1 + strongest * 0.7;
-        const alpha = (isDimmed ? 0.28 : 1) * Math.min(1, twinkle * (0.55 + strongest * 0.6));
+        const radius = star.size * (0.6 + 0.75 * near) * (1 + strongest * 0.7);
+        const alpha =
+          base * Math.min(1, twinkle * (0.42 + 0.52 * near + strongest * 0.6));
         const fill = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 
-        ctx.globalAlpha = alpha * 0.18;
         ctx.fillStyle = fill;
+        ctx.globalAlpha = alpha * 0.16;
         ctx.beginPath();
-        ctx.arc(x, y, star.size * boost * 2, 0, TAU);
+        ctx.arc(x, y, radius * 2.2, 0, TAU);
         ctx.fill();
 
         ctx.globalAlpha = alpha;
         ctx.beginPath();
-        ctx.arc(x, y, star.size * boost, 0, TAU);
+        ctx.arc(x, y, radius, 0, TAU);
         ctx.fill();
       }
 
-      ctx.globalAlpha = isDimmed ? 0.28 : 1;
+      // --- Çıkıntının ucundaki yıldız: arkadaşın kendisi ---
+      // Akan yıldızlar ucun tam tepesine her an denk gelmiyor, o yüzden sivri
+      // ucun parlaklığı sallanıyordu. Buraya sabitlenmiş bir yıldız, en kritik
+      // bilgiyi — yönü — her karede okunur tutuyor.
+      for (const bump of bumps) {
+        const r = ringRadius + bump.amp;
+        const x = c + Math.sin(bump.angle) * r;
+        const y = c - Math.cos(bump.angle) * r;
+        const radius = 1.3 + 2.2 * bump.presence;
+        const fill = `rgb(${bump.rgb[0]}, ${bump.rgb[1]}, ${bump.rgb[2]})`;
 
-      // --- Yön harfleri: -heading ile ters döner, K hep gerçek kuzeyi gösterir ---
-      const letterRadius = size * R_LETTERS;
-      ctx.font = `600 ${Math.round(size * 0.038)}px var(--font-geist-sans), system-ui, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      for (const [label, deg] of [
-        ["K", 0],
-        ["D", 90],
-        ["G", 180],
-        ["B", 270],
-      ] as const) {
-        const a = ((deg - (head ?? 0)) * Math.PI) / 180;
-        ctx.fillStyle = deg === 0 ? "#e8c37a" : "rgba(139, 143, 163, 0.75)";
-        ctx.fillText(label, c + Math.sin(a) * letterRadius, c - Math.cos(a) * letterRadius);
+        ctx.fillStyle = fill;
+        ctx.globalAlpha = base * 0.18 * bump.presence;
+        ctx.beginPath();
+        ctx.arc(x, y, radius * 3.4, 0, TAU);
+        ctx.fill();
+
+        ctx.globalAlpha = base * (0.45 + 0.55 * bump.presence);
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, TAU);
+        ctx.fill();
       }
 
       // --- Merkez: sen ---
       const pulse = isWaiting ? 0.5 + 0.5 * Math.sin(seconds * 2.2) : 0;
       if (isWaiting) {
-        ctx.globalAlpha = (isDimmed ? 0.28 : 1) * (0.35 - pulse * 0.3);
+        ctx.globalAlpha = base * (0.35 - pulse * 0.3);
         ctx.strokeStyle = "#e8c37a";
         ctx.lineWidth = 1.2;
         ctx.beginPath();
@@ -347,13 +362,13 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
         ctx.stroke();
       }
 
-      ctx.globalAlpha = (isDimmed ? 0.28 : 1) * 0.28;
       ctx.fillStyle = "#e8c37a";
+      ctx.globalAlpha = base * 0.28;
       ctx.beginPath();
       ctx.arc(c, c, size * 0.022, 0, TAU);
       ctx.fill();
 
-      ctx.globalAlpha = isDimmed ? 0.28 : 1;
+      ctx.globalAlpha = base;
       ctx.beginPath();
       ctx.arc(c, c, size * 0.008, 0, TAU);
       ctx.fill();
