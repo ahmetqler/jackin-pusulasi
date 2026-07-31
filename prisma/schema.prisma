@@ -1,0 +1,62 @@
+// Jack'in Pusulası — veri modeli
+//
+// Gizlilik ilkesi: kullanıcı başına TEK, üzerine yazılan konum satırı tutulur.
+// Location.userId birincil anahtar olduğu için konum geçmişi biriktirmek
+// yapısal olarak imkânsız. Koordinatlar bu tablonun dışına asla çıkmaz —
+// dışarıya sadece src/lib/radar.ts içindeki buildRadarPayload() yön ve
+// mesafe üretir.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  displayName  String
+  passwordHash String
+  friendCode   String   @unique
+  sharing      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  location         Location?
+  sentRequests     Friendship[] @relation("SentRequests")
+  receivedRequests Friendship[] @relation("ReceivedRequests")
+}
+
+/// Son bilinen konum. userId PRIMARY KEY -> satır her zaman üzerine yazılır,
+/// geçmiş tutulmaz. Görünmez moda geçildiğinde bu satır tamamen silinir.
+model Location {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lat       Float
+  lng       Float
+  accuracyM Int?
+  updatedAt DateTime @default(now())
+}
+
+model Friendship {
+  id          String           @id @default(uuid())
+  requesterId String
+  addresseeId String
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  respondedAt DateTime?
+
+  requester User @relation("SentRequests", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("ReceivedRequests", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status])
+  @@index([requesterId, status])
+}
