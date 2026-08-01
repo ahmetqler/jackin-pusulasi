@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import CompassDebug from "@/components/CompassDebug";
+import PermissionsSection from "@/components/PermissionsSection";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
 import { formatFriendCode } from "@/lib/friendCodeFormat";
 import type { Profile } from "@/lib/profile";
@@ -59,16 +60,6 @@ export default function SettingsScreen({ initialProfile }: { initialProfile: Pro
   const sharing = profile.sharing;
   const push = usePushSubscription();
 
-  async function togglePush() {
-    if (push.subscribed) {
-      await push.disable();
-      setNote("Bildirimler kapatıldı");
-      return;
-    }
-    const error = await push.enable();
-    setNote(error ?? "Bildirimler açıldı");
-  }
-
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-2">
@@ -101,56 +92,30 @@ export default function SettingsScreen({ initialProfile }: { initialProfile: Pro
           </p>
         </section>
 
-        {push.supported && (
-          <section className="rounded-xl border border-edge bg-surface p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="font-semibold">Bildirimler</h2>
-                <p className="mt-1 text-sm leading-relaxed text-muted">
-                  {push.denied
-                    ? "Bildirimleri tarayıcı ayarlarından engellemişsin. Oradan izin verip tekrar dene."
-                    : "Arkadaşın seni merak edip dürttüğünde haberin olsun. Bildirime dokununca uygulama açılır ve konumun güncellenir."}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => void togglePush()}
-                disabled={push.busy || push.denied}
-                aria-pressed={push.subscribed}
-                className={`mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-40 ${
-                  push.subscribed ? "bg-accent" : "bg-edge"
-                }`}
-              >
-                <span
-                  className={`block h-6 w-6 rounded-full bg-background transition-transform ${
-                    push.subscribed ? "translate-x-6" : "translate-x-0.5"
-                  }`}
-                />
-              </button>
-            </div>
+        <PermissionsSection push={push} />
 
-            {push.subscribed && (
-              <label className="mt-4 flex items-center justify-between gap-3 border-t border-edge pt-3">
-                <span className="text-sm">
-                  Arkadaşlarım beni dürtebilsin
-                  <span className="mt-0.5 block text-xs text-muted">
-                    Kapatırsan kimse sana &ldquo;uygulamayı aç&rdquo; bildirimi gönderemez.
-                  </span>
+        {push.subscribed && (
+          <section className="rounded-xl border border-edge bg-surface p-4">
+            <label className="flex items-center justify-between gap-3">
+              <span className="text-sm font-medium">
+                Arkadaşlarım beni dürtebilsin
+                <span className="mt-0.5 block text-xs font-normal text-muted">
+                  Kapatırsan kimse sana &ldquo;uygulamayı aç&rdquo; bildirimi gönderemez.
                 </span>
-                <input
-                  type="checkbox"
-                  checked={profile.acceptsNudges}
-                  disabled={busy}
-                  onChange={(e) =>
-                    void patch(
-                      { acceptsNudges: e.target.checked },
-                      e.target.checked ? "Dürtmeye açıksın" : "Dürtme kapatıldı",
-                    )
-                  }
-                  className="h-5 w-5 shrink-0 accent-[var(--accent)]"
-                />
-              </label>
-            )}
+              </span>
+              <input
+                type="checkbox"
+                checked={profile.acceptsNudges}
+                disabled={busy}
+                onChange={(e) =>
+                  void patch(
+                    { acceptsNudges: e.target.checked },
+                    e.target.checked ? "Dürtmeye açıksın" : "Dürtme kapatıldı",
+                  )
+                }
+                className="h-5 w-5 shrink-0 accent-[var(--accent)]"
+              />
+            </label>
           </section>
         )}
 
