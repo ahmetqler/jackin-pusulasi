@@ -1,6 +1,6 @@
 // Sürüm numarası her yayında artırılır: activate sırasında eski önbellek
 // silinsin, telefonda kurulu uygulama bayat paketle açılmasın.
-const CACHE_NAME = "jack-shell-v2";
+const CACHE_NAME = "jack-shell-v3";
 const APP_SHELL = [
   "/",
   "/friends",
