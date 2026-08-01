@@ -42,7 +42,7 @@ export type HeadingState = {
   canRequestPermission: boolean;
   /** İlk okuma beklenirken true — rozeti hemen yakıp söndürmemek için. */
   settling: boolean;
-  requestPermission: () => Promise<void>;
+  requestPermission: () => Promise<boolean>;
 };
 
 export function useHeading(active: boolean): HeadingState {
@@ -50,6 +50,8 @@ export function useHeading(active: boolean): HeadingState {
   /** Son geçerli okumanın zamanı — bekçi bunu izliyor. */
   const lastEventRef = useRef(0);
   const lastAppliedRef = useRef(0);
+  /** Bu açılışta kendiliğinden izin istendi mi — açılış başına bir kez. */
+  const autoAskedRef = useRef(false);
 
   const [heading, setHeading] = useState<number | null>(null);
   const [accuracy, setAccuracy] = useState<number | null>(null);
@@ -126,7 +128,54 @@ export function useHeading(active: boolean): HeadingState {
       // Dinleyicileri yeniden kur — izin öncesi kurulanlar iOS'ta sessiz kalıyor.
       setPermissionNonce((n) => n + 1);
     }
+    return granted;
   }, []);
+
+  /**
+   * İzni İLK DOKUNUŞTA kendiliğinden iste.
+   *
+   * iOS pusula iznini kalıcı hatırlamıyor: her yeni açılışta bir kullanıcı
+   * hareketiyle yeniden istenmesi gerekiyor, bunu değiştirmenin yolu yok.
+   * Değiştirebileceğimiz şey, kullanıcının bunun için özel bir butonu bulup
+   * basmak zorunda kalması. İzin herhangi bir dokunuşla istenebiliyor — o
+   * yüzden ekrana ilk dokunulduğunda sessizce istiyoruz. Daha önce izin
+   * verilmişse iOS diyaloğu hiç göstermeden "granted" dönüyor, yani kullanıcı
+   * için görünmez oluyor.
+   *
+   * Sadece veri akmıyorsa kuruluyor ve `once` olduğu için tek sefer çalışıyor:
+   * reddedilirse aynı açılışta tekrar tekrar sorulmuyor.
+   */
+  // Yeni bir açılış (sekme öne geldi) yeni bir deneme hakkı demek.
+  useEffect(() => {
+    autoAskedRef.current = false;
+  }, [active]);
+
+  useEffect(() => {
+    if (!active || !needsOrientationPermission()) return;
+
+    let armed = true;
+    let cleanupGesture: (() => void) | undefined;
+
+    const arm = setTimeout(() => {
+      // Veri akıyorsa gerek yok. Bir kez sorulduysa da tekrar sorma: izin
+      // verildiği hâlde sensör susuyorsa (bozuk/kısıtlı cihaz) her dokunuşta
+      // yeniden istemenin anlamı olmaz.
+      if (!armed || autoAskedRef.current || lastEventRef.current !== 0) return;
+
+      const onGesture = () => {
+        autoAskedRef.current = true;
+        void requestPermission();
+      };
+      window.addEventListener("pointerdown", onGesture, { once: true });
+      cleanupGesture = () => window.removeEventListener("pointerdown", onGesture);
+    }, SETTLE_MS);
+
+    return () => {
+      armed = false;
+      clearTimeout(arm);
+      cleanupGesture?.();
+    };
+  }, [active, permissionNonce, requestPermission]);
 
   return { heading, accuracy, canRequestPermission, settling, requestPermission };
 }
