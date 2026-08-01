@@ -29,11 +29,43 @@ model User {
   /// Kullanıcının kendi seçtiği yıldız rengi (hex). Arkadaşları bu renkte görür.
   color        String   @default("#e8c37a")
   sharing      Boolean  @default(true)
+  /// Arkadaşları "uygulamayı aç" bildirimi gönderebilsin mi.
+  acceptsNudges Boolean @default(true)
   createdAt    DateTime @default(now())
 
-  location         Location?
-  sentRequests     Friendship[] @relation("SentRequests")
-  receivedRequests Friendship[] @relation("ReceivedRequests")
+  location          Location?
+  sentRequests      Friendship[] @relation("SentRequests")
+  receivedRequests  Friendship[] @relation("ReceivedRequests")
+  pushSubscriptions PushSubscription[]
+  nudgesSent        Nudge[]      @relation("NudgeFrom")
+  nudgesReceived    Nudge[]      @relation("NudgeTo")
+}
+
+/// Bir cihazın bildirim aboneliği. Kullanıcı birden fazla cihazdan girebilir.
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Dürtme hız sınırı. Yön başına TEK satır, üzerine yazılır — kimin kimi ne
+/// zaman dürttüğünün geçmişi tutulmuyor, sadece "en son ne zaman" bilgisi.
+model Nudge {
+  fromId String
+  toId   String
+  sentAt DateTime @default(now())
+
+  from User @relation("NudgeFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to   User @relation("NudgeTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@id([fromId, toId])
 }
 
 /// Son bilinen konum. userId PRIMARY KEY -> satır her zaman üzerine yazılır,

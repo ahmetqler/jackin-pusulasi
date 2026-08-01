@@ -41,6 +41,13 @@ export async function PATCH(request: Request) {
     await prisma.user.update({ where: { id: userId }, data: { color: raw.color } });
   }
 
+  if (typeof raw.acceptsNudges === "boolean") {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { acceptsNudges: raw.acceptsNudges },
+    });
+  }
+
   if (typeof raw.sharing === "boolean") {
     if (raw.sharing) {
       await prisma.user.update({ where: { id: userId }, data: { sharing: true } });

@@ -18,6 +18,8 @@ export default function RadarScreen() {
   const { payload, clockOffsetMs, offline, loading, refresh } = useRadar(active, fixRef);
   const now = useNow(1000);
   const [busy, setBusy] = useState(false);
+  const [nudging, setNudging] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   const northUp = compass.heading === null;
   const serverNow = now + clockOffsetMs;
@@ -39,6 +41,23 @@ export default function RadarScreen() {
 
   const nearest = friends.find((f) => f.distanceMeters !== null) ?? null;
   const invisible = payload?.me.sharing === false;
+
+  /** Bundan eskiyse "dürt" butonu çıkar — arkadaş uygulamayı açmamış demektir. */
+  const STALE_AFTER_MS = 15 * 60 * 1000;
+
+  async function nudge(friendId: string, name: string) {
+    setNudging(friendId);
+    setNote(null);
+    try {
+      const response = await fetch(`/api/friends/${friendId}/nudge`, { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      setNote(response.ok ? `${name} dürtüldü` : (data.error ?? "Gönderilemedi"));
+    } catch {
+      setNote("Gönderilemedi");
+    } finally {
+      setNudging(null);
+    }
+  }
 
   async function enableSharing() {
     setBusy(true);
@@ -156,18 +175,31 @@ export default function RadarScreen() {
         )}
 
         {friends.length > 0 ? (
-          <ul className="max-h-[26dvh] overflow-y-auto rounded-xl border border-edge bg-surface">
-            {friends.map((friend) => (
-              <FriendRow
-                key={friend.id}
-                friend={friend}
-                color={friend.color}
-                rotation={friend.bearing === null ? null : friend.bearing - (compass.heading ?? 0)}
-                ageMs={ageOf(friend.updatedAt)}
-                northUp={northUp}
-              />
-            ))}
-          </ul>
+          <>
+            <ul className="max-h-[26dvh] overflow-y-auto rounded-xl border border-edge bg-surface">
+              {friends.map((friend) => {
+                const age = ageOf(friend.updatedAt);
+                // Görünmez moddaki arkadaşı dürtmenin anlamı yok: konumunu
+                // kapatmayı kendisi seçmiş, uygulamayı açması bir şey değiştirmez.
+                const stale = friend.sharing && (age === null || age > STALE_AFTER_MS);
+                return (
+                  <FriendRow
+                    key={friend.id}
+                    friend={friend}
+                    color={friend.color}
+                    rotation={
+                      friend.bearing === null ? null : friend.bearing - (compass.heading ?? 0)
+                    }
+                    ageMs={age}
+                    northUp={northUp}
+                    onNudge={stale ? () => void nudge(friend.id, friend.name) : undefined}
+                    nudging={nudging === friend.id}
+                  />
+                );
+              })}
+            </ul>
+            {note && <p className="text-center text-xs text-muted">{note}</p>}
+          </>
         ) : (
           !loading && (
             <Link

@@ -28,5 +28,6 @@ export const config = {
     "/api/me/:path*",
     "/api/location/:path*",
     "/api/friends/:path*",
+    "/api/push/:path*",
   ],
 };

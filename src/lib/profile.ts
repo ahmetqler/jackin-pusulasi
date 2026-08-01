@@ -7,6 +7,7 @@ export const profileSelect = {
   friendCode: true,
   color: true,
   sharing: true,
+  acceptsNudges: true,
 } as const;
 
 export type Profile = {
@@ -16,6 +17,7 @@ export type Profile = {
   friendCode: string;
   color: string;
   sharing: boolean;
+  acceptsNudges: boolean;
 };
 
 /** Kullanıcı artık yoksa null — çağıran taraf oturumu sonlandırır. */

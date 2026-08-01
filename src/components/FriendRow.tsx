@@ -11,9 +11,20 @@ type Props = {
   ageMs: number | null;
   /** Pusula yoksa yön sözle anlatılır: "kuzeydoğu". */
   northUp: boolean;
+  /** Konumu bayatladıysa "Dürt" butonu gösterilir; yoksa undefined. */
+  onNudge?: () => void;
+  nudging?: boolean;
 };
 
-export default function FriendRow({ friend, color, rotation, ageMs, northUp }: Props) {
+export default function FriendRow({
+  friend,
+  color,
+  rotation,
+  ageMs,
+  northUp,
+  onNudge,
+  nudging,
+}: Props) {
   const status = (() => {
     if (!friend.sharing) return "Gizli";
     if (friend.updatedAt === null) return "Konum yok";
@@ -60,9 +71,20 @@ export default function FriendRow({ friend, color, rotation, ageMs, northUp }: P
         </span>
       )}
 
-      <span className="w-12 shrink-0 text-right font-mono text-xs tabular-nums text-muted">
-        {ageMs === null ? "" : formatAgeShort(ageMs)}
-      </span>
+      {onNudge ? (
+        <button
+          type="button"
+          onClick={onNudge}
+          disabled={nudging}
+          className="shrink-0 rounded-full border border-edge px-2.5 py-1 text-xs font-medium text-muted disabled:opacity-40"
+        >
+          {nudging ? "…" : "Dürt"}
+        </button>
+      ) : (
+        <span className="w-12 shrink-0 text-right font-mono text-xs tabular-nums text-muted">
+          {ageMs === null ? "" : formatAgeShort(ageMs)}
+        </span>
+      )}
     </li>
   );
 }
