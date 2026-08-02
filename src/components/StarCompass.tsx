@@ -70,6 +70,47 @@ const FADE_MS = 5 * 60 * 1000;
 const TAU = Math.PI * 2;
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
+// --- Günde bir dakikalık sürpriz: 16:44'te küre kalbe dönüşür ---------------
+const HEART_HOUR = 16;
+const HEART_MINUTE = 44;
+/** Oluşma ve çözülme süreleri (saniye); arası tam kalp olarak geçer. */
+const HEART_IN_S = 14;
+const HEART_OUT_S = 8;
+const HEART_RGB: [number, number, number] = [251, 113, 133];
+
+const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+
+/** 0 = normal küre, 1 = tam kalp. Cihazın kendi saatine bakar. */
+function heartMorph(now: Date): number {
+  if (now.getHours() !== HEART_HOUR || now.getMinutes() !== HEART_MINUTE) return 0;
+  const s = now.getSeconds() + now.getMilliseconds() / 1000;
+  if (s < HEART_IN_S) return easeInOut(s / HEART_IN_S);
+  if (s < 60 - HEART_OUT_S) return 1;
+  return easeInOut((60 - s) / HEART_OUT_S);
+}
+
+/**
+ * Klasik kalp eğrisi, birim kareye ölçeklenmiş.
+ * x = 16sin³t, y = 13cos t − 5cos2t − 2cos3t − cos4t
+ * Ekranda y aşağı büyüdüğü için işareti çevriliyor.
+ */
+function heartPoint(t: number): [number, number] {
+  const s = Math.sin(t);
+  const x = 16 * s * s * s;
+  const y =
+    13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+  return [x / 17, -y / 17];
+}
+
+/** Minik kalp — yıldızın çekirdeği bununla çiziliyor. */
+function fillHeart(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + r * 0.8);
+  ctx.bezierCurveTo(x - r * 1.7, y - r * 0.5, x - r * 0.55, y - r * 1.5, x, y - r * 0.4);
+  ctx.bezierCurveTo(x + r * 0.55, y - r * 1.5, x + r * 1.7, y - r * 0.5, x, y + r * 0.8);
+  ctx.fill();
+}
+
 /** Deterministik gürültü — her açılışta aynı gökyüzü. */
 function makeRandom(seed: number) {
   let state = seed >>> 0;
@@ -237,6 +278,12 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
       const sphereRadius = size * R_SPHERE;
       const base = isDimmed ? 0.28 : 1;
 
+      // Günde bir dakika (16:44) küre kalbe dönüşür. Bu dakikada çıkıntılar
+      // sönüyor: yön göstermek bir dakikalığına yerini süse bırakıyor, yoksa
+      // sivri uçlar kalbin hatlarını bozardı.
+      const morph = reduceMotion ? 0 : heartMorph(new Date());
+      const heartScale = sphereRadius * 1.2;
+
       ctx.clearRect(0, 0, size, size);
 
       // --- Arkadaşların gökyüzünde açtığı çıkıntılar ---
@@ -324,9 +371,22 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
         // Tepeden bakış: ekran yarıçapı yükseklik kosinüsüyle küçülüyor,
         // ekran AÇISI ise yalnızca kerterize bağlı — yön bozulmuyor.
         const r =
-          (sphereRadius + displacement) * star.cosLat + star.shell * size * SHELL;
-        const x = c + Math.sin(theta) * r;
-        const y = c - Math.cos(theta) * r;
+          (sphereRadius + displacement * (1 - morph)) * star.cosLat +
+          star.shell * size * SHELL;
+        let x = c + Math.sin(theta) * r;
+        let y = c - Math.cos(theta) * r;
+
+        if (morph > 0) {
+          // Yıldız, küredeki yerinden kalp eğrisi üzerindeki karşılığına
+          // kayıyor. Akış devam ettiği için yıldızlar kalbi çiziyor gibi
+          // görünüyor. cosLat çarpanı iç halkaları küçük kalpler yapıp
+          // şeklin dolgun durmasını sağlıyor.
+          const [hx, hy] = heartPoint(theta);
+          const scale = heartScale * (0.35 + 0.65 * star.cosLat);
+          x += (c + hx * scale - x) * morph;
+          y += (c + hy * scale - y) * morph;
+          rgb = mix(rgb, HEART_RGB, morph * 0.75);
+        }
 
         const near = (star.sinLat + 1) / 2; // 0 dip (uzak), 1 tepe (yakın)
         const twinkle = 0.55 + 0.45 * Math.sin(seconds * star.speed + star.phase);
@@ -351,9 +411,18 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
         ctx.fill();
 
         ctx.globalAlpha = alpha * (0.3 + 0.7 * near);
-        ctx.beginPath();
-        ctx.arc(x, y, radius, 0, TAU);
-        ctx.fill();
+        // Çekirdek kalbe dönüşüyor. Eşik yıldızın kendi fazından türetiliyor:
+        // hepsi aynı anda değil, tek tek dönüşsünler. Hâle daire kalıyor —
+        // zaten bulanık bir parıltı, şeklinin bir önemi yok ve 540 yıldıza
+        // ikinci bir kalp çizmek boşuna yük olurdu.
+        const esik = 0.3 + 0.45 * ((star.phase / TAU) % 1);
+        if (morph > esik) {
+          fillHeart(ctx, x, y, radius * 1.5);
+        } else {
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, TAU);
+          ctx.fill();
+        }
       }
 
       // --- Çıkıntının ucundaki yıldız: arkadaşın kendisi ---
@@ -363,8 +432,13 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
       // Tek arkadaş varsa isim yazmıyoruz — kimin olduğu zaten kürenin altındaki
       // yazıda duruyor, kadranı gereksiz kalabalıklaştırmanın anlamı yok.
       const showNames = bumps.length > 1;
+      // Kalp dakikasında arkadaş uçları ve isimleri sönüyor: çıkıntılar zaten
+      // düzleşti, ortada gösterecek bir yön kalmadı.
+      const bumpFade = 1 - morph;
 
       for (const bump of bumps) {
+        if (bumpFade <= 0.01) break;
+
         const r = sphereRadius + bump.amp;
         const x = c + Math.sin(bump.angle) * r;
         const y = c - Math.cos(bump.angle) * r;
@@ -372,12 +446,12 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
         const fill = `rgb(${bump.rgb[0]}, ${bump.rgb[1]}, ${bump.rgb[2]})`;
 
         ctx.fillStyle = fill;
-        ctx.globalAlpha = base * 0.18 * bump.presence;
+        ctx.globalAlpha = base * bumpFade * 0.18 * bump.presence;
         ctx.beginPath();
         ctx.arc(x, y, radius * 3.4, 0, TAU);
         ctx.fill();
 
-        ctx.globalAlpha = base * (0.45 + 0.55 * bump.presence);
+        ctx.globalAlpha = base * bumpFade * (0.45 + 0.55 * bump.presence);
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, TAU);
         ctx.fill();
@@ -409,13 +483,13 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
         );
 
         // Yıldızların üstünde okunabilsin diye koyu bir kontur.
-        ctx.globalAlpha = base * 0.85;
+        ctx.globalAlpha = base * bumpFade * 0.85;
         ctx.lineWidth = 3;
         ctx.lineJoin = "round";
         ctx.strokeStyle = "#05060b";
         ctx.strokeText(label, lx, ly);
 
-        ctx.globalAlpha = base * (0.55 + 0.45 * bump.presence);
+        ctx.globalAlpha = base * bumpFade * (0.55 + 0.45 * bump.presence);
         ctx.fillStyle = fill;
         ctx.fillText(label, lx, ly);
       }
