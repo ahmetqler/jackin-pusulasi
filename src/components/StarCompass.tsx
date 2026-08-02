@@ -80,9 +80,14 @@ const HEART_RGB: [number, number, number] = [251, 113, 133];
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 
-/** 0 = normal küre, 1 = tam kalp. Cihazın kendi saatine bakar. */
+/** O bir dakikanın içinde miyiz? Cihazın kendi saatine bakar. */
+function isHeartMinute(now: Date): boolean {
+  return now.getHours() === HEART_HOUR && now.getMinutes() === HEART_MINUTE;
+}
+
+/** 0 = normal küre, 1 = tam kalp. */
 function heartMorph(now: Date): number {
-  if (now.getHours() !== HEART_HOUR || now.getMinutes() !== HEART_MINUTE) return 0;
+  if (!isHeartMinute(now)) return 0;
   const s = now.getSeconds() + now.getMilliseconds() / 1000;
   if (s < HEART_IN_S) return easeInOut(s / HEART_IN_S);
   if (s < 60 - HEART_OUT_S) return 1;
@@ -281,7 +286,12 @@ export default function StarCompass({ friends, heading, waiting, dimmed }: Props
       // Günde bir dakika (16:44) küre kalbe dönüşür. Bu dakikada çıkıntılar
       // sönüyor: yön göstermek bir dakikalığına yerini süse bırakıyor, yoksa
       // sivri uçlar kalbin hatlarını bozardı.
-      const morph = reduceMotion ? 0 : heartMorph(new Date());
+      //
+      // "Hareketi azalt" açıkken sürprizi tamamen saklamıyoruz: rahatsız eden
+      // şey hareketin kendisi, kalbin varlığı değil. O yüzden dönüşüm
+      // animasyonu atlanıp dakika boyunca hareketsiz, tam bir kalp gösteriliyor.
+      const clock = new Date();
+      const morph = reduceMotion ? (isHeartMinute(clock) ? 1 : 0) : heartMorph(clock);
       const heartScale = sphereRadius * 1.2;
 
       ctx.clearRect(0, 0, size, size);
